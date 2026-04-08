@@ -1,0 +1,19 @@
+[functions]
+  directory = "netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
+
+# 9 AM UTC = 10 AM UK winter (GMT) / 10 AM UK summer (BST)
+[functions."morning-reminder"]
+  schedule = "0 9 * * *"
+
+# 18 UTC = 7 PM UK summer (BST) / 6 PM UK winter (GMT)
+[functions."evening-reminder"]
+  schedule = "0 18 * * *"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Service-Worker-Allowed = "/"
+    Cache-Control = "no-cache, no-store, must-revalidate"

@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dog Feeder">
+  <meta name="theme-color" content="#FAFAF9">
+  <title>Dog Feeder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #FAFAF9;
+      --surface: #FFFFFF;
+      --amber:   #F59E0B;
+      --amber-d: #D97706;
+      --amber-l: #FEF9EE;
+      --text:    #1C1917;
+      --text2:   #A8A29E;
+      --border:  #E7E5E4;
+      --fed-bg:  #DCFCE7;
+      --fed-border: #4ADE80;
+      --fed-title:  #15803D;
+      --fed-detail: #166534;
+      --r:       20px;
+      --sat: env(safe-area-inset-top,    0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+
+    html[data-theme="dark"] {
+      --bg:      #0C0A09;
+      --surface: #1C1917;
+      --amber-l: #1C1400;
+      --amber-d: #FCD34D;
+      --text:    #FAFAF9;
+      --text2:   #57534E;
+      --border:  #292524;
+      --fed-bg:  #052E16;
+      --fed-border: #166534;
+      --fed-title:  #4ADE80;
+      --fed-detail: #86EFAC;
+    }
+
+    html[data-theme="dark"] .icon-btn {
+      border-color: #44403C;
+      background: #292524;
+      color: #FAFAF9;
+    }
+
+    html {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100%;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── App shell ──────────────────────────── */
+    #app {
+      height: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      overflow: hidden;
+    }
+    .screen.active { transform: translateX(0); }
+
+    /* ── Shared header ──────────────────────── */
+    .hdr {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(var(--sat) + 14px) 18px 12px;
+    }
+    .hdr-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .hdr-hello { font-size: 13px; font-weight: 500; color: var(--text2); margin-top: 1px; }
+    .icon-btn {
+      width: 38px; height: 38px;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      display: grid; place-items: center;
+      font-size: 16px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Scrollable body ────────────────────── */
+    .body {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 4px 18px 20px;
+    }
+
+    /* ── Tab bar ────────────────────────────── */
+    .tab-bar {
+      flex-shrink: 0;
+      display: flex;
+      gap: 4px;
+      padding: 6px 12px calc(var(--sab) + 6px);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px 4px;
+      border-radius: 14px; border: none;
+      background: transparent;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 600;
+      color: var(--text2); cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-btn .ti { font-size: 22px; line-height: 1; }
+    .tab-btn.active { background: var(--amber-l); color: var(--amber-d); }
+
+    /* ── Meal status cards ──────────────────── */
+    .meal-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-bottom: 14px;
+    }
+    .meal-card {
+      border-radius: 20px; padding: 16px 14px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .meal-card.fed { background: var(--fed-bg); border-color: var(--fed-border); }
+    .meal-card-icon  { margin-bottom: 8px; line-height: 0; }
+    .meal-card-icon svg, .meal-icon svg { display: inline-block; vertical-align: middle; }
+    .meal-toggle-btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .meal-card-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text2); margin-bottom: 4px;
+    }
+    .meal-card.fed .meal-card-title { color: var(--fed-title); }
+    .meal-card-status { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .meal-card.fed .meal-card-status { color: var(--fed-title); }
+    .meal-card-detail { font-size: 12px; color: var(--text2); line-height: 1.3; }
+    .meal-card.fed .meal-card-detail { color: var(--fed-detail); }
+
+    /* ── Meal toggle ────────────────────────── */
+    .meal-toggle {
+      display: flex; background: var(--border);
+      border-radius: 14px; padding: 3px; gap: 3px;
+      margin-bottom: 16px;
+    }
+    .meal-toggle-btn {
+      flex: 1; padding: 11px 8px;
+      border-radius: 11px; border: none;
+      background: transparent;
+      font-size: 14px; font-weight: 600;
+      color: var(--text2); cursor: pointer;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .meal-toggle-btn.active {
+      background: var(--surface); color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    /* ── Section label ──────────────────────── */
+    .sec-lbl { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2); margin-bottom: 10px; }
+
+    /* ── Member buttons ─────────────────────── */
+    .members-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .member-btn {
+      padding: 18px 12px; min-height: 76px;
+      border-radius: 18px; border: 2px solid transparent;
+      font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+      cursor: pointer; display: grid; place-items: center;
+      transition: transform 0.12s, opacity 0.12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .member-btn:active { transform: scale(0.93); opacity: 0.7; }
+
+    /* ── History list ───────────────────────── */
+    .day-lbl {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--text2); margin: 18px 0 8px;
+    }
+    .day-lbl:first-child { margin-top: 4px; }
+    .feed-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; background: var(--surface);
+      border-radius: 16px; margin-bottom: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px var(--border);
+    }
+    .feed-avatar {
+      width: 38px; height: 38px; border-radius: 11px;
+      display: grid; place-items: center;
+      font-size: 14px; font-weight: 800; flex-shrink: 0;
+    }
+    .feed-name { font-size: 15px; font-weight: 700; }
+    .feed-time { font-size: 13px; color: var(--text2); }
+    .delete-feed-btn {
+      margin-left: auto; flex-shrink: 0;
+      background: none; border: none;
+      color: var(--text2); opacity: 0.45;
+      padding: 8px; border-radius: 8px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s, color 0.15s;
+    }
+    .delete-feed-btn:active { opacity: 1; color: #F43F5E; }
+
+    /* ── Toast ──────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: calc(var(--sab) + 88px); left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: #1C1917; color: #fff;
+      padding: 11px 18px; border-radius: 100px;
+      font-size: 14px; font-weight: 600;
+      opacity: 0; pointer-events: none; white-space: nowrap;
+      transition: opacity 0.22s, transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
+      z-index: 200;
+    }
+    #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Forms (setup + settings) ───────────── */
+    .form-body {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 0 20px calc(var(--sab) + 28px);
+    }
+
+    .page-hero { text-align: center; padding: calc(var(--sat) + 32px) 0 28px; }
+    .page-icon  { font-size: 56px; margin-bottom: 10px; }
+    .page-title { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 6px; }
+    .page-sub   { font-size: 15px; color: var(--text2); line-height: 1.45; }
+
+    .field { margin-bottom: 22px; }
+    .field-lbl {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--text2); margin-bottom: 8px;
+    }
+    .txt {
+      width: 100%; padding: 14px 16px;
+      border-radius: 16px; border: 2px solid var(--border);
+      font-size: 17px; font-family: inherit;
+      background: var(--surface); color: var(--text);
+      outline: none; -webkit-appearance: none; appearance: none;
+      transition: border-color 0.15s;
+    }
+    .txt:focus { border-color: var(--amber); }
+
+    .chip-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .chip {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 14px; background: var(--surface);
+      border-radius: 14px; border: 1.5px solid var(--border);
+    }
+    .chip span { font-size: 16px; font-weight: 600; }
+    .chip-x {
+      background: none; border: none; font-size: 16px;
+      color: var(--text2); cursor: pointer; padding: 2px 4px; line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .add-row { display: flex; gap: 8px; }
+    .add-row .txt { flex: 1; }
+    .btn-outline {
+      flex-shrink: 0; padding: 14px 16px; border-radius: 16px;
+      border: 2px solid var(--amber); background: transparent;
+      color: var(--amber-d); font-size: 15px; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary {
+      display: block; width: 100%; padding: 17px; border-radius: 18px; border: none;
+      background: linear-gradient(135deg, #FBBF24, #F59E0B);
+      color: #fff; font-size: 17px; font-weight: 800;
+      cursor: pointer; margin-top: 10px;
+      box-shadow: 0 4px 16px rgba(245,158,11,0.38);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-danger {
+      display: block; width: 100%; padding: 16px; border-radius: 18px;
+      border: 2px solid #F43F5E; background: transparent;
+      color: #F43F5E; font-size: 16px; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Analytics ──────────────────────────── */
+    .analytics-summary {
+      text-align: center; font-size: 14px; font-weight: 600;
+      color: var(--text2); padding: 4px 0 18px;
+    }
+    .stat-item {
+      background: var(--surface); border-radius: 16px;
+      padding: 14px 16px; margin-bottom: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px var(--border);
+    }
+    .stat-header {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 9px;
+    }
+    .stat-name  { font-size: 15px; font-weight: 700; }
+    .stat-count { font-size: 13px; font-weight: 600; color: var(--text2); }
+    .stat-bar-bg {
+      height: 6px; background: var(--border);
+      border-radius: 100px; overflow: hidden;
+    }
+    .stat-bar-fill { height: 100%; border-radius: 100px; transition: width 0.5s ease; }
+
+    .avg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .avg-card {
+      background: var(--surface); border-radius: 20px;
+      padding: 18px 14px; text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px var(--border);
+    }
+    .avg-card-icon  { font-size: 24px; margin-bottom: 6px; }
+    .avg-card-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text2); margin-bottom: 6px;
+    }
+    .avg-card-time  { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .avg-card-sub   { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+    /* ── Nav row button (settings → sub-screen) */
+    .nav-row-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; padding: 16px 18px; margin-top: 10px;
+      border-radius: 16px; border: 1.5px solid var(--border);
+      background: var(--surface); color: var(--text);
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-chevron { font-size: 22px; color: var(--text2); line-height: 1; }
+
+    /* ── Empty / error states ───────────────── */
+    .empty {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 56px 20px; color: var(--text2); gap: 10px; text-align: center;
+    }
+    .empty .ei { font-size: 44px; }
+
+    .error-box {
+      margin: 0 0 16px; padding: 13px 15px;
+      background: #FFF1F2; border: 1.5px solid #FECDD3;
+      border-radius: 14px; font-size: 13px; color: #9F1239; line-height: 1.5;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── SETUP SCREEN ─────────────────────── -->
+  <div id="s-setup" class="screen active">
+    <div class="form-body">
+      <div class="page-hero">
+        <div class="page-icon">🐾</div>
+        <div class="page-title">Dog Feed Tracker</div>
+        <div class="page-sub">Set up once — your whole family shares the same app.</div>
+      </div>
+
+      <div id="setup-err" class="error-box"></div>
+
+      <div class="field">
+        <div class="field-lbl">Your dog's name</div>
+        <input id="setup-dog" class="txt" type="text" placeholder="e.g. Buddy" autocomplete="off" autocorrect="off" autocapitalize="words">
+      </div>
+
+      <div class="field">
+        <div class="field-lbl">Family members</div>
+        <div class="chip-list" id="setup-chips"></div>
+        <div class="add-row">
+          <input id="setup-name-in" class="txt" type="text" placeholder="Add a name" autocomplete="off" autocorrect="off" autocapitalize="words">
+          <button class="btn-outline" id="setup-add">Add</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="setup-save">Let's go!</button>
+    </div>
+  </div>
+
+  <!-- ── MAIN SCREEN ──────────────────────── -->
+  <div id="s-main" class="screen">
+    <div class="hdr">
+      <div>
+        <div class="hdr-title" id="main-title">Meals</div>
+        <div class="hdr-hello" id="main-hello"></div>
+      </div>
+      <button class="icon-btn" id="open-settings">⚙️</button>
+    </div>
+
+    <!-- Feed panel -->
+    <div class="body" id="p-feed">
+      <div class="meal-row">
+        <div class="meal-card" id="card-morning">
+          <div class="meal-card-icon" id="icon-morning"></div>
+          <div class="meal-card-title">Morning</div>
+          <div class="meal-card-status" id="status-morning">Not yet</div>
+          <div class="meal-card-detail" id="detail-morning"></div>
+        </div>
+        <div class="meal-card" id="card-evening">
+          <div class="meal-card-icon" id="icon-evening"></div>
+          <div class="meal-card-title">Evening</div>
+          <div class="meal-card-status" id="status-evening">Not yet</div>
+          <div class="meal-card-detail" id="detail-evening"></div>
+        </div>
+      </div>
+      <div class="meal-toggle">
+        <button class="meal-toggle-btn active" id="toggle-morning"><span id="ti-morning"></span>Morning</button>
+        <button class="meal-toggle-btn"        id="toggle-evening"><span id="ti-evening"></span>Evening</button>
+      </div>
+      <div class="sec-lbl">Who fed the dog?</div>
+      <div class="members-grid" id="members-grid"></div>
+    </div>
+
+    <!-- History panel -->
+    <div class="body" id="p-history" style="display:none">
+      <div id="history-list"></div>
+    </div>
+
+    <!-- Analytics panel -->
+    <div class="body" id="p-analytics" style="display:none">
+      <div id="analytics-content"></div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-feed-btn"><span class="ti">🍽️</span>Feed</button>
+      <button class="tab-btn"        id="tab-hist-btn"><span class="ti">📋</span>History</button>
+      <button class="tab-btn"        id="tab-stat-btn"><span class="ti">📊</span>Stats</button>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS SCREEN ──────────────────── -->
+  <div id="s-settings" class="screen">
+    <div class="hdr">
+      <div class="hdr-title">Settings</div>
+      <button class="icon-btn" id="close-settings">✕</button>
+    </div>
+    <div class="form-body" style="padding-top: 8px;">
+      <div class="field">
+        <div class="field-lbl">Dog's name</div>
+        <input id="set-dog" class="txt" type="text" placeholder="Dog's name" autocomplete="off" autocorrect="off" autocapitalize="words">
+      </div>
+      <div class="field">
+        <div class="field-lbl">Family members</div>
+        <div class="chip-list" id="set-chips"></div>
+        <div class="add-row">
+          <input id="set-name-in" class="txt" type="text" placeholder="Add a name" autocomplete="off" autocorrect="off" autocapitalize="words">
+          <button class="btn-outline" id="set-add">Add</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-lbl">Notifications for this device</div>
+        <select id="notif-member" class="txt" style="margin-bottom:8px">
+          <option value="">Select your name…</option>
+        </select>
+        <button class="btn-outline" id="notif-enable" style="width:100%;padding:14px;border-radius:16px;">Enable notifications on this device</button>
+        <div id="notif-status" style="font-size:13px;text-align:center;margin-top:8px;line-height:1.4"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.5">
+          On iPhone, add this app to your Home Screen first (Safari → Share → Add to Home Screen), then enable notifications.
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-lbl">Appearance</div>
+        <div class="meal-toggle">
+          <button class="meal-toggle-btn active" id="theme-light">☀️ Light</button>
+          <button class="meal-toggle-btn"        id="theme-dark">🌙 Dark</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="set-save">Save changes</button>
+      <button class="nav-row-btn" id="open-testing">
+        <span>Testing</span>
+        <span class="nav-chevron">›</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── IDENTITY SCREEN ─────────────────────── -->
+  <div id="s-identity" class="screen">
+    <div class="form-body">
+      <div class="page-hero">
+        <div class="page-icon">👋</div>
+        <div class="page-title">Hello!</div>
+        <div class="page-sub">Who are you? We'll remember you on this device.</div>
+      </div>
+      <div class="members-grid" id="identity-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── TESTING SCREEN ───────────────────────── -->
+  <div id="s-testing" class="screen">
+    <div class="hdr">
+      <div class="hdr-title">Testing</div>
+      <button class="icon-btn" id="close-testing">✕</button>
+    </div>
+    <div class="form-body" style="padding-top:8px">
+      <div class="field-lbl">Data</div>
+      <button class="btn-outline" id="set-sample" style="width:100%;padding:16px;border-radius:16px;margin-bottom:10px">Create sample data</button>
+      <button class="btn-danger"  id="set-clear">Delete all feeding history</button>
+      <button class="btn-danger"  id="set-reset">Reset app</button>
+
+      <button class="btn-danger" id="set-forget">Forget me on this device</button>
+
+      <div class="field-lbl" style="margin-top:28px">Push notifications</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="btn-outline" id="test-morning" style="padding:14px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:6px"><span id="ti-test-morning"></span>Morning</button>
+        <button class="btn-outline" id="test-evening" style="padding:14px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:6px"><span id="ti-test-evening"></span>Evening</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script type="module">
+// ╔═══════════════════════════════════════════════════╗
+// ║  STEP 1 — Paste your Firebase config object here  ║
+// ╚═══════════════════════════════════════════════════╝
+// ╔═══════════════════════════════════════════════════╗
+// ║  STEP 2 — Paste your VAPID public key here        ║
+// ║  Run: npx web-push generate-vapid-keys            ║
+// ╚═══════════════════════════════════════════════════╝
+const VAPID_PUBLIC_KEY = 'BEKjYxWFbhpUcxMV8TAeoGEOwOgPbp0bvJ5cF_DwaKZdKoxirBnOpg-ySxruxsaeDcoGQ_KuR1yh-DI_La05ZSc';
+// ════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDYzGbNv_sZpfLFuJiQEpV3qzIvNb0kjIA",
+  authDomain:        "dog-feeder-69516.firebaseapp.com",
+  projectId:         "dog-feeder-69516",
+  storageBucket:     "dog-feeder-69516.firebasestorage.app",
+  messagingSenderId: "1094095302896",
+  appId:             "1:1094095302896:web:e04b6ad5ded60be2eed235"
+};
+// ════════════════════════════════════════════════════
+
+import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, addDoc, doc, setDoc, getDoc,
+         onSnapshot, query, orderBy, serverTimestamp, getDocs, writeBatch, Timestamp, deleteDoc }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Meal icons ─────────────────────────────────────
+const TRASH_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+
+function mealSvg(meal, size = 18) {
+  const a = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"`;
+  return meal === 'morning'
+    ? `<svg ${a}><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.93" y2="5.93"/><line x1="18.07" y1="18.07" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.93" y2="18.07"/><line x1="18.07" y1="5.93" x2="19.78" y2="4.22"/></svg>`
+    : `<svg ${a}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+}
+
+function injectMealIcons() {
+  document.getElementById('icon-morning').innerHTML    = mealSvg('morning', 28);
+  document.getElementById('icon-evening').innerHTML    = mealSvg('evening', 28);
+  document.getElementById('ti-morning').innerHTML      = mealSvg('morning', 15);
+  document.getElementById('ti-evening').innerHTML      = mealSvg('evening', 15);
+  document.getElementById('ti-test-morning').innerHTML = mealSvg('morning', 15);
+  document.getElementById('ti-test-evening').innerHTML = mealSvg('evening', 15);
+}
+
+// ── Colour palette for member buttons ─────────────
+const PALETTE = [
+  { bg: '#FEF3C7', text: '#78350F', border: '#F59E0B' },
+  { bg: '#DCFCE7', text: '#14532D', border: '#22C55E' },
+  { bg: '#DBEAFE', text: '#1E3A5F', border: '#60A5FA' },
+  { bg: '#FFE4E6', text: '#881337', border: '#F43F5E' },
+  { bg: '#EDE9FE', text: '#3B0764', border: '#A78BFA' },
+  { bg: '#FFEDD5', text: '#7C2D12', border: '#FB923C' },
+  { bg: '#CCFBF1', text: '#134E4A', border: '#2DD4BF' },
+  { bg: '#FCE7F3', text: '#831843', border: '#F472B6' },
+];
+
+// ── App state ──────────────────────────────────────
+let swReg          = null;
+let mySubscription = null;
+let cfg            = null;   // { dogName, members[] }
+let feedings     = [];
+let selectedMeal = 'morning';
+let setupMbrs    = [];
+let settingsMbrs = [];
+let unsubscribe  = null;
+let toastTimer   = null;
+
+// ── Bootstrap ──────────────────────────────────────
+const NOT_CONFIGURED = FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY';
+
+let db;
+try {
+  const fbApp = initializeApp(FIREBASE_CONFIG);
+  db = getFirestore(fbApp);
+} catch (e) { /* will surface on first use */ }
+
+async function init() {
+  if (NOT_CONFIGURED) {
+    setupErr('Firebase is not configured yet. Open <code>index.html</code>, find the <strong>FIREBASE_CONFIG</strong> block near the top of the &lt;script&gt;, and paste in your project\'s config values.');
+    show('s-setup');
+    return;
+  }
+  try {
+    const snap = await getDoc(doc(db, 'app', 'config'));
+    if (snap.exists()) {
+      cfg = snap.data();
+      enterMain();
+    } else {
+      show('s-setup');
+    }
+  } catch (e) {
+    setupErr(`Could not reach Firebase: ${e.message}<br>Check your config and make sure Firestore rules allow read/write.`);
+    show('s-setup');
+  }
+}
+
+// ── Screen transitions ─────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Main screen ────────────────────────────────────
+function enterMain() {
+  document.getElementById('main-title').textContent = `${cfg.dogName}'s Meals`;
+  injectMealIcons();
+  renderButtons();
+  selectMeal('morning'); // will be corrected by refreshMealCards once data loads
+  subscribeFeedings();
+  initServiceWorker();
+
+  const myName = localStorage.getItem('myName');
+  if (!myName) {
+    renderIdentityGrid();
+    show('s-identity');
+  } else {
+    applyIdentity(myName);
+    show('s-main');
+    handleDeepLink();
+  }
+}
+
+function renderIdentityGrid() {
+  const grid = document.getElementById('identity-grid');
+  grid.innerHTML = '';
+  cfg.members.forEach((name, i) => {
+    const c   = PALETTE[i % PALETTE.length];
+    const btn = document.createElement('button');
+    btn.className = 'member-btn';
+    btn.textContent = name;
+    btn.style.cssText = `background:${c.bg};color:${c.text};border-color:${c.border}`;
+    btn.addEventListener('click', () => setIdentity(name));
+    grid.appendChild(btn);
+  });
+}
+
+function setIdentity(name) {
+  localStorage.setItem('myName', name);
+  // Pre-fill the notifications member select with same name
+  localStorage.setItem('notifMember', name);
+  applyIdentity(name);
+  show('s-main');
+  handleDeepLink();
+}
+
+function applyIdentity(name) {
+  document.getElementById('main-hello').textContent = `Hello, ${name}`;
+}
+
+function subscribeFeedings() {
+  if (unsubscribe) unsubscribe();
+  const q = query(collection(db, 'feedings'), orderBy('timestamp', 'desc'));
+  unsubscribe = onSnapshot(q,
+    snap => {
+      feedings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      refreshMealCards();
+      renderHistory();
+      renderAnalytics();
+    },
+    err => toast(`Sync error: ${err.message}`)
+  );
+}
+
+// ── Feed tab ───────────────────────────────────────
+function renderButtons() {
+  const grid = document.getElementById('members-grid');
+  grid.innerHTML = '';
+  cfg.members.forEach((name, i) => {
+    const c   = PALETTE[i % PALETTE.length];
+    const btn = document.createElement('button');
+    btn.className = 'member-btn';
+    btn.textContent = name;
+    btn.style.cssText = `background:${c.bg};color:${c.text};border-color:${c.border}`;
+    btn.addEventListener('click', () => logFeeding(name));
+    grid.appendChild(btn);
+  });
+}
+
+async function logFeeding(name) {
+  try {
+    await addDoc(collection(db, 'feedings'), {
+      memberName: name,
+      mealTime:   selectedMeal,
+      timestamp:  serverTimestamp(),
+    });
+    const label = selectedMeal === 'morning' ? 'morning' : 'evening';
+    toast(`${name} logged the ${label} feed! 🐾`);
+    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    notifyOthers(name, label, time);
+  } catch (e) {
+    toast('Could not save — check your connection.');
+  }
+}
+
+function refreshMealCards() {
+  const todayStart = startOfDay(new Date()).getTime();
+
+  ['morning', 'evening'].forEach(meal => {
+    const fed = feedings.find(f => {
+      if (f.mealTime !== meal) return false;
+      const ts = f.timestamp?.toDate?.() ?? new Date();
+      return startOfDay(ts).getTime() === todayStart;
+    });
+    const card     = document.getElementById(`card-${meal}`);
+    const statusEl = document.getElementById(`status-${meal}`);
+    const detailEl = document.getElementById(`detail-${meal}`);
+    if (fed) {
+      card.classList.add('fed');
+      statusEl.textContent = 'Fed ✓';
+      const ts = fed.timestamp?.toDate?.() ?? new Date();
+      detailEl.textContent = `${fed.memberName} · ${ts.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    } else {
+      card.classList.remove('fed');
+      statusEl.textContent = 'Not yet';
+      detailEl.textContent = '';
+    }
+  });
+  autoSelectMeal();
+}
+
+function autoSelectMeal() {
+  const todayStart = startOfDay(new Date()).getTime();
+  const morningDone = feedings.some(f => {
+    if (f.mealTime !== 'morning') return false;
+    const ts = f.timestamp?.toDate?.() ?? new Date();
+    return startOfDay(ts).getTime() === todayStart;
+  });
+  selectMeal(morningDone ? 'evening' : 'morning');
+}
+
+function selectMeal(meal) {
+  selectedMeal = meal;
+  document.getElementById('toggle-morning').classList.toggle('active', meal === 'morning');
+  document.getElementById('toggle-evening').classList.toggle('active', meal === 'evening');
+}
+
+// ── History tab ────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('history-list');
+
+  if (!feedings.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">🍽️</div><p>No feedings logged yet.<br>Tap a name on the Feed tab.</p></div>`;
+    return;
+  }
+
+  const groups = new Map();
+  feedings.forEach(f => {
+    const ts  = f.timestamp?.toDate?.() ?? new Date();
+    const key = dayLabel(ts);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ ...f, ts });
+  });
+
+  let html = '';
+  groups.forEach((items, label) => {
+    html += `<div class="day-lbl">${label}</div>`;
+    items.forEach(f => {
+      const idx = cfg.members.indexOf(f.memberName);
+      const c   = PALETTE[(idx >= 0 ? idx : hashCode(f.memberName)) % PALETTE.length];
+      const t    = f.ts.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const mealLabel = f.mealTime === 'morning' ? 'Morning' : f.mealTime === 'evening' ? 'Evening' : '';
+      const meal = mealLabel ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${mealSvg(f.mealTime, 13)} ${mealLabel}</span>` : '';
+      html += `
+        <div class="feed-item">
+          <div class="feed-avatar" style="background:${c.bg};color:${c.text}">${f.memberName.charAt(0).toUpperCase()}</div>
+          <div>
+            <div class="feed-name">${f.memberName}</div>
+            <div class="feed-time">${meal ? meal + ' · ' : ''}${t}</div>
+          </div>
+          <button class="delete-feed-btn" data-id="${f.id}" aria-label="Remove entry">${TRASH_SVG}</button>
+        </div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+// ── Analytics ──────────────────────────────────────
+function renderAnalytics() {
+  const el = document.getElementById('analytics-content');
+  if (!feedings.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">📊</div><p>No feeding data yet.<br>Log some feeds to see stats.</p></div>`;
+    return;
+  }
+
+  // Feeder counts
+  const counts = Object.fromEntries(cfg.members.map(m => [m, 0]));
+  feedings.forEach(f => { counts[f.memberName] = (counts[f.memberName] ?? 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const maxCount = sorted[0]?.[1] || 1;
+
+  // Average times
+  const morningFeeds = feedings.filter(f => f.mealTime === 'morning' && f.timestamp);
+  const eveningFeeds = feedings.filter(f => f.mealTime === 'evening' && f.timestamp);
+
+  let html = `<div class="analytics-summary">${feedings.length} total feeds logged</div>`;
+
+  // Leaderboard
+  html += `<div class="sec-lbl">Feeding leaderboard</div>`;
+  sorted.forEach(([name, count]) => {
+    const idx = cfg.members.indexOf(name);
+    const c   = PALETTE[(idx >= 0 ? idx : hashCode(name)) % PALETTE.length];
+    const pct = Math.round(count / maxCount * 100);
+    html += `
+      <div class="stat-item">
+        <div class="stat-header">
+          <span class="stat-name">${name}</span>
+          <span class="stat-count">${count} feed${count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="stat-bar-bg">
+          <div class="stat-bar-fill" style="width:${pct}%;background:${c.border}"></div>
+        </div>
+      </div>`;
+  });
+
+  // Average times
+  html += `<div class="sec-lbl" style="margin-top:20px">Average feed times</div>`;
+  html += `<div class="avg-row">`;
+  [['morning', morningFeeds], ['evening', eveningFeeds]].forEach(([meal, feeds]) => {
+    const avg = calcAvgTime(feeds);
+    html += `
+      <div class="avg-card">
+        <div class="avg-card-icon">${mealSvg(meal, 28)}</div>
+        <div class="avg-card-label">${meal}</div>
+        <div class="avg-card-time">${avg ?? '—'}</div>
+        <div class="avg-card-sub">${feeds.length} feed${feeds.length !== 1 ? 's' : ''}</div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+function calcAvgTime(feeds) {
+  if (!feeds.length) return null;
+  const totalMins = feeds.reduce((sum, f) => {
+    const ts = f.timestamp.toDate();
+    return sum + ts.getHours() * 60 + ts.getMinutes();
+  }, 0);
+  const avg = Math.round(totalMins / feeds.length);
+  return new Date(2000, 0, 1, Math.floor(avg / 60), avg % 60)
+    .toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+// ── Delete individual feeding ──────────────────────
+document.getElementById('history-list').addEventListener('click', async e => {
+  const btn = e.target.closest('.delete-feed-btn');
+  if (!btn) return;
+  if (!confirm('Remove this feeding entry?')) return;
+  try {
+    await deleteDoc(doc(db, 'feedings', btn.dataset.id));
+  } catch (e) {
+    toast('Could not delete — check your connection.');
+  }
+});
+
+// ── Tab switching ──────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('p-feed').style.display      = tab === 'feed'      ? '' : 'none';
+  document.getElementById('p-history').style.display   = tab === 'history'   ? '' : 'none';
+  document.getElementById('p-analytics').style.display = tab === 'analytics' ? '' : 'none';
+  document.getElementById('tab-feed-btn').classList.toggle('active', tab === 'feed');
+  document.getElementById('tab-hist-btn').classList.toggle('active', tab === 'history');
+  document.getElementById('tab-stat-btn').classList.toggle('active', tab === 'analytics');
+}
+
+// ── Setup ──────────────────────────────────────────
+function setupErr(msg) {
+  const b = document.getElementById('setup-err');
+  b.innerHTML = msg;
+  b.style.display = 'block';
+}
+
+function renderChips(scope, list) {
+  const prefix = scope === 'setup' ? 'setup' : 'set';
+  const el = document.getElementById(`${prefix}-chips`);
+  el.innerHTML = list.map((m, i) => `
+    <div class="chip">
+      <span>${m}</span>
+      <button class="chip-x" data-scope="${scope}" data-i="${i}" aria-label="Remove ${m}">✕</button>
+    </div>`).join('');
+  el.querySelectorAll('.chip-x').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const s = btn.dataset.scope, i = +btn.dataset.i;
+      if (s === 'setup')    setupMbrs.splice(i, 1);
+      else                  settingsMbrs.splice(i, 1);
+      renderChips(s, s === 'setup' ? setupMbrs : settingsMbrs);
+    })
+  );
+}
+
+function addChip(scope) {
+  const input = document.getElementById(`${scope === 'setup' ? 'setup' : 'set'}-name-in`);
+  const name  = input.value.trim();
+  if (!name) return;
+  if (scope === 'setup') setupMbrs.push(name);
+  else                   settingsMbrs.push(name);
+  input.value = '';
+  renderChips(scope, scope === 'setup' ? setupMbrs : settingsMbrs);
+  input.focus();
+}
+
+document.getElementById('setup-add').addEventListener('click', () => addChip('setup'));
+document.getElementById('setup-name-in').addEventListener('keydown', e => { if (e.key === 'Enter') addChip('setup'); });
+document.getElementById('setup-save').addEventListener('click', async () => {
+  const dogName = document.getElementById('setup-dog').value.trim();
+  if (!dogName)          return alert("Please enter your dog's name.");
+  if (!setupMbrs.length) return alert('Please add at least one family member.');
+  cfg = { dogName, members: setupMbrs };
+  await setDoc(doc(db, 'app', 'config'), cfg);
+  enterMain();
+});
+
+// ── Settings ───────────────────────────────────────
+document.getElementById('open-settings').addEventListener('click', () => {
+  settingsMbrs = [...cfg.members];
+  document.getElementById('set-dog').value = cfg.dogName;
+  renderChips('settings', settingsMbrs);
+  // Populate notification member select
+  const sel     = document.getElementById('notif-member');
+  const current = localStorage.getItem('notifMember') ?? '';
+  sel.innerHTML = '<option value="">Select your name…</option>' +
+    cfg.members.map(m => `<option value="${m}"${m === current ? ' selected' : ''}>${m}</option>`).join('');
+  updateNotifStatus();
+  show('s-settings');
+});
+document.getElementById('close-settings').addEventListener('click', () => show('s-main'));
+document.getElementById('open-testing').addEventListener('click',   () => show('s-testing'));
+document.getElementById('close-testing').addEventListener('click',  () => show('s-settings'));
+document.getElementById('set-forget').addEventListener('click', () => {
+  localStorage.removeItem('myName');
+  localStorage.removeItem('notifMember');
+  document.getElementById('main-hello').textContent = '';
+  show('s-main');
+  toast('Identity forgotten on this device.');
+});
+
+document.getElementById('set-add').addEventListener('click', () => addChip('settings'));
+document.getElementById('set-name-in').addEventListener('keydown', e => { if (e.key === 'Enter') addChip('settings'); });
+document.getElementById('set-save').addEventListener('click', async () => {
+  const dogName = document.getElementById('set-dog').value.trim();
+  if (!dogName)             return alert("Please enter your dog's name.");
+  if (!settingsMbrs.length) return alert('Please add at least one family member.');
+  cfg = { dogName, members: settingsMbrs };
+  await setDoc(doc(db, 'app', 'config'), cfg);
+  document.getElementById('main-title').textContent = `${cfg.dogName}'s Meals`;
+  renderButtons();
+  show('s-main');
+  toast('Settings saved!');
+});
+document.getElementById('set-reset').addEventListener('click', () => {
+  if (confirm('Reset settings? Your feeding history will be kept.')) {
+    setupMbrs = [];
+    renderChips('setup', setupMbrs);
+    document.getElementById('setup-dog').value = '';
+    show('s-setup');
+  }
+});
+document.getElementById('set-clear').addEventListener('click', async () => {
+  if (!confirm('Delete all feeding history? This cannot be undone.')) return;
+  try {
+    const snap  = await getDocs(collection(db, 'feedings'));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    toast('All feeding history deleted.');
+  } catch (e) {
+    toast('Could not delete — check your connection.');
+  }
+});
+
+// ── Push notifications ─────────────────────────────
+const NOTIF_CONFIGURED = VAPID_PUBLIC_KEY !== 'PASTE_YOUR_VAPID_PUBLIC_KEY_HERE';
+
+async function initServiceWorker() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    swReg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    mySubscription = await swReg.pushManager.getSubscription();
+
+    // Handle tab-switch messages from notification taps (app already open)
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type === 'SWITCH_TAB') {
+        switchTab(event.data.tab);
+        show('s-main');
+      }
+    });
+  } catch (e) {
+    console.warn('SW init failed:', e);
+  }
+}
+
+function handleDeepLink() {
+  const tab = window.location.hash.slice(1);
+  if (['feed', 'history', 'analytics'].includes(tab)) switchTab(tab);
+}
+
+async function enableNotifications() {
+  const memberName = document.getElementById('notif-member').value;
+  if (!memberName) return toast('Please select your name first.');
+
+  if (!NOTIF_CONFIGURED) {
+    return toast('VAPID key not configured — see setup instructions.');
+  }
+  if (!swReg) {
+    // Try registering on-demand (user may have opened settings before SW loaded)
+    await initServiceWorker();
+    if (!swReg) return toast('Notifications not supported on this browser.');
+  }
+
+  let perm = Notification.permission;
+  if (perm === 'default') perm = await Notification.requestPermission();
+  if (perm !== 'granted') return toast('Notification permission was denied.');
+
+  try {
+    const sub = await swReg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    const subJson = sub.toJSON();
+    const docId   = safeDocId(sub.endpoint);
+    await setDoc(doc(db, 'subscriptions', docId), {
+      memberName,
+      endpoint: sub.endpoint,
+      p256dh:   subJson.keys.p256dh,
+      auth:     subJson.keys.auth,
+    });
+    mySubscription = sub;
+    localStorage.setItem('notifMember', memberName);
+    updateNotifStatus();
+    toast(`Notifications enabled for ${memberName}!`);
+  } catch (e) {
+    toast(`Could not enable: ${e.message}`);
+  }
+}
+
+function updateNotifStatus() {
+  const el   = document.getElementById('notif-status');
+  const name = localStorage.getItem('notifMember');
+  if (!el) return;
+  if (mySubscription && name) {
+    el.textContent = `✓ Enabled for ${name} on this device`;
+    el.style.color = 'var(--fed-title)';
+  } else {
+    el.textContent = Notification.permission === 'denied'
+      ? 'Blocked — enable in your browser/phone settings'
+      : 'Not enabled on this device';
+    el.style.color = 'var(--text2)';
+  }
+}
+
+function notifyOthers(feeder, mealTime, time) {
+  if (!NOTIF_CONFIGURED) return;
+  const payload = {
+    title: `${cfg.dogName} has been fed! 🐾`,
+    body:  `${feeder} fed ${cfg.dogName} (${mealTime}) at ${time}`,
+    url:   `${window.location.origin}/#history`,
+  };
+  fetch('/.netlify/functions/notify', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ payload, senderEndpoint: mySubscription?.endpoint ?? null }),
+  }).catch(() => {}); // fire and forget
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw     = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function safeDocId(str) {
+  return btoa(str).replace(/[^a-zA-Z0-9]/g, '').slice(0, 40);
+}
+
+document.getElementById('notif-enable').addEventListener('click', enableNotifications);
+
+// ── Sample data ────────────────────────────────────
+document.getElementById('set-sample').addEventListener('click', async () => {
+  const memberList = cfg.members.join(', ');
+  if (!confirm(`Add 2 weeks of sample data using members: ${memberList}?\n\nExisting data will not be removed.`)) return;
+
+  toast('Creating sample data…');
+
+  // Pick 2 random day/meal slots to skip (simulating missed feeds)
+  const skipped = new Set();
+  while (skipped.size < 2) {
+    const day  = Math.floor(Math.random() * 14) + 1;
+    const meal = Math.random() < 0.5 ? 'morning' : 'evening';
+    skipped.add(`${day}-${meal}`);
+  }
+
+  const docs = [];
+  for (let daysAgo = 14; daysAgo >= 1; daysAgo--) {
+    for (const meal of ['morning', 'evening']) {
+      if (skipped.has(`${daysAgo}-${meal}`)) continue;
+
+      const d = new Date();
+      d.setDate(d.getDate() - daysAgo);
+      d.setSeconds(0, 0);
+
+      if (meal === 'morning') {
+        d.setHours(6 + Math.floor(Math.random() * 3));  // 6–8 am
+        d.setMinutes(Math.floor(Math.random() * 60));
+      } else {
+        d.setHours(17 + Math.floor(Math.random() * 3)); // 5–7 pm
+        d.setMinutes(Math.floor(Math.random() * 60));
+      }
+
+      docs.push({
+        memberName: cfg.members[Math.floor(Math.random() * cfg.members.length)],
+        mealTime:   meal,
+        timestamp:  Timestamp.fromDate(d),
+      });
+    }
+  }
+
+  try {
+    await Promise.all(docs.map(d => addDoc(collection(db, 'feedings'), d)));
+    toast(`Done — ${docs.length} feedings added (2 missed).`);
+  } catch (e) {
+    toast('Error creating sample data.');
+  }
+});
+
+// ── Test reminder buttons ──────────────────────────
+async function testReminder(meal) {
+  toast(`Triggering ${meal} reminder…`);
+  try {
+    const res  = await fetch(`/.netlify/functions/${meal}-reminder`);
+    const data = await res.json();
+    if (data.notified > 0)      toast(`✓ Sent to ${data.notified} device(s)`);
+    else if (data.notified === 0) toast('No subscribers registered yet');
+    else if (res.ok)             toast(JSON.stringify(data));
+  } catch (e) {
+    toast('Could not reach function — are you on the live site?');
+  }
+}
+
+document.getElementById('test-morning').addEventListener('click', () => testReminder('morning'));
+document.getElementById('test-evening').addEventListener('click', () => testReminder('evening'));
+
+// ── Theme ──────────────────────────────────────────
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  document.getElementById('theme-light').classList.toggle('active', t === 'light');
+  document.getElementById('theme-dark').classList.toggle('active',  t === 'dark');
+  document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#0C0A09' : '#FAFAF9';
+}
+
+document.getElementById('theme-light').addEventListener('click', () => setTheme('light'));
+document.getElementById('theme-dark').addEventListener('click',  () => setTheme('dark'));
+
+// Sync toggle state when opening settings
+document.getElementById('open-settings').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  document.getElementById('theme-light').classList.toggle('active', current === 'light');
+  document.getElementById('theme-dark').classList.toggle('active',  current === 'dark');
+}, true); // capture so it fires before the existing listener replaces the screen
+
+// ── Meal toggle buttons ────────────────────────────
+document.getElementById('toggle-morning').addEventListener('click', () => selectMeal('morning'));
+document.getElementById('toggle-evening').addEventListener('click', () => selectMeal('evening'));
+
+// ── Tab buttons ────────────────────────────────────
+document.getElementById('tab-feed-btn').addEventListener('click', () => switchTab('feed'));
+document.getElementById('tab-hist-btn').addEventListener('click', () => switchTab('history'));
+document.getElementById('tab-stat-btn').addEventListener('click', () => switchTab('analytics'));
+
+// ── Toast ──────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 2800);
+}
+
+// ── Helpers ────────────────────────────────────────
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 60)  return 'Just now';
+  const m = Math.floor(s / 60);
+  if (m < 60)  return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24)  return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function dayLabel(date) {
+  const today    = startOfDay(new Date()).getTime();
+  const d        = startOfDay(date).getTime();
+  const daysAgo  = Math.round((today - d) / 86400000);
+  if (daysAgo === 0) return 'Today';
+  if (daysAgo === 1) return 'Yesterday';
+  if (daysAgo <= 6)  return date.toLocaleDateString([], { weekday: 'long' });
+  const opts = date.getFullYear() === new Date().getFullYear()
+    ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' };
+  return date.toLocaleDateString([], opts);
+}
+
+function hashCode(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+  return Math.abs(h);
+}
+
+// ── Go ─────────────────────────────────────────────
+const initTheme = localStorage.getItem('theme') ||
+  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+setTheme(initTheme);
+init();
+</script>
+</body>
+</html>
