@@ -1,2 +1,5 @@
 node_modules/
 .netlify/
+generate-icons.js
+package.json
+package-lock.json
