@@ -315,7 +315,15 @@
       padding: 13px 14px; background: var(--surface);
       border-radius: 14px; border: 1.5px solid var(--border);
     }
-    .chip span { font-size: 16px; font-weight: 600; }
+    .chip-info { display: flex; align-items: center; gap: 8px; }
+    .chip-name { font-size: 16px; font-weight: 600; }
+    .chip-actions { display: flex; align-items: center; gap: 8px; }
+    .chip-seen { font-size: 12px; font-weight: 600; color: var(--text2); }
+    .presence-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .presence-dot.active   { background: #22C55E; }
+    .presence-dot.inactive { background: var(--text2); opacity: 0.4; }
     .chip-x {
       background: none; border: none; font-size: 16px;
       color: var(--text2); cursor: pointer; padding: 2px 4px; line-height: 1;
@@ -664,6 +672,7 @@ let setupMbrs    = [];
 let settingsMbrs = [];
 let unsubscribe  = null;
 let toastTimer   = null;
+let presenceData = {};
 
 // ── Bootstrap ──────────────────────────────────────
 const NOT_CONFIGURED = FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY';
@@ -751,6 +760,9 @@ function setIdentity(name) {
 
 function applyIdentity(name) {
   document.getElementById('feed-greeting').textContent = heroGreeting();
+  if (name) {
+    setDoc(doc(db, 'app', 'presence'), { [name]: serverTimestamp() }, { merge: true }).catch(() => {});
+  }
 }
 
 function subscribeFeedings() {
@@ -984,11 +996,24 @@ function setupErr(msg) {
 function renderChips(scope, list) {
   const prefix = scope === 'setup' ? 'setup' : 'set';
   const el = document.getElementById(`${prefix}-chips`);
-  el.innerHTML = list.map((m, i) => `
+  el.innerHTML = list.map((m, i) => {
+    if (scope === 'settings') {
+      const raw = presenceData[m];
+      const ts  = raw ? (raw.toDate ? raw.toDate() : new Date(raw.seconds * 1000)) : null;
+      const dot = `<span class="presence-dot ${ts ? 'active' : 'inactive'}"></span>`;
+      const lbl = `<span class="chip-seen">${ts ? dayLabel(ts) : 'Never'}</span>`;
+      return `
+      <div class="chip">
+        <div class="chip-info">${dot}<span class="chip-name">${m}</span></div>
+        <div class="chip-actions">${lbl}<button class="chip-x" data-scope="${scope}" data-i="${i}" aria-label="Remove ${m}">✕</button></div>
+      </div>`;
+    }
+    return `
     <div class="chip">
-      <span>${m}</span>
+      <div class="chip-info"><span class="chip-name">${m}</span></div>
       <button class="chip-x" data-scope="${scope}" data-i="${i}" aria-label="Remove ${m}">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   el.querySelectorAll('.chip-x').forEach(btn =>
     btn.addEventListener('click', () => {
       const s = btn.dataset.scope, i = +btn.dataset.i;
@@ -1022,9 +1047,13 @@ document.getElementById('setup-save').addEventListener('click', async () => {
 });
 
 // ── Settings ───────────────────────────────────────
-document.getElementById('open-settings').addEventListener('click', () => {
+document.getElementById('open-settings').addEventListener('click', async () => {
   settingsMbrs = [...cfg.members];
   document.getElementById('set-dog').value = cfg.dogName;
+  try {
+    const snap = await getDoc(doc(db, 'app', 'presence'));
+    presenceData = snap.exists() ? snap.data() : {};
+  } catch { presenceData = {}; }
   renderChips('settings', settingsMbrs);
   // Populate notification member select
   const sel     = document.getElementById('notif-member');
